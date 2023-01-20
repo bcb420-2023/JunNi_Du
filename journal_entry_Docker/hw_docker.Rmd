@@ -1,0 +1,17 @@
+---
+title: "Journal Entry: Docker"
+---
+
+```{r}
+x <- matrix(runif(50, 1, 100), ncol=10, nrow=5)
+colnames(x) <- c("cond1", "cond2", "cond3", "cond4", "cond5", 
+                 "ctrl1", "ctrl2", "ctrl3", "ctrl4", "ctrl5")
+rownames(x) <- c("gene1", "gene2", "gene3", "gene4", "gene5")
+x
+
+# Note: here the fold change is calculated as condition/control. 
+# There also exists another definition of fold change as 
+# (condition - control)/control, but is less-used nowadays.
+fold_change <- (x[, 1:5] / x[, 6:10])
+fold_change
+```
