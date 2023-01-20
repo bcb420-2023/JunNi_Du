@@ -358,29 +358,25 @@ colnames(x) &lt;- c(&quot;cond1&quot;, &quot;cond2&quot;, &quot;cond3&quot;, &qu
                  &quot;ctrl1&quot;, &quot;ctrl2&quot;, &quot;ctrl3&quot;, &quot;ctrl4&quot;, &quot;ctrl5&quot;)
 rownames(x) &lt;- c(&quot;gene1&quot;, &quot;gene2&quot;, &quot;gene3&quot;, &quot;gene4&quot;, &quot;gene5&quot;)
 x</code></pre>
-<pre><code>##           cond1    cond2    cond3    cond4    cond5    ctrl1    ctrl2     ctrl3
-## gene1 92.534838 34.01248 33.51938 45.08959 33.73500 58.16403 32.97696  2.156767
-## gene2 97.164244 93.38663 48.77307 98.72759 96.74471 39.62100 34.99084 66.396812
-## gene3 80.375907 26.78139 69.28604 62.53912 34.70768 33.88226 33.39984 80.101275
-## gene4  7.933551 99.21366 60.27768 57.87934  7.90392 96.43155 51.42007 65.435261
-## gene5 81.059168 64.07801 68.19650 65.02526 91.47448 67.41036 47.00839 74.431230
-##          ctrl4     ctrl5
-## gene1 55.01239 51.601462
-## gene2 84.37282 16.198441
-## gene3 84.14044  6.081905
-## gene4 96.45751 69.185510
-## gene5 32.75385  3.726871</code></pre>
-<pre class="r"><code># Note: here the fold change is calculated as condition/control. 
-# There also exists another definition of fold change as 
-# (condition - control)/control, but is less-used nowadays.
-fold_change &lt;- (x[, 1:5] / x[, 6:10])
+<pre><code>##          cond1    cond2     cond3    cond4     cond5     ctrl1    ctrl2
+## gene1 39.18573 89.12860 50.995138 35.44421 48.721884 79.129441 38.39177
+## gene2 72.42732 25.20350 68.719515 10.56121 16.311323 77.634581 11.71803
+## gene3 66.45613 39.29598 28.598395 87.62535 34.312966 84.975001 77.73426
+## gene4  7.74336 43.92427 61.105482 66.90995 71.201834  3.678845 66.73027
+## gene5 87.98895 16.78608  5.499975 65.92015  7.810996  2.559913 43.37289
+##          ctrl3    ctrl4    ctrl5
+## gene1 13.80996 56.19561 97.51125
+## gene2 48.96759 95.73050 86.16270
+## gene3 72.69234 31.54345 73.84044
+## gene4 21.01946 45.67677 60.41514
+## gene5 15.00286 87.70396 46.29863</code></pre>
+<pre class="r"><code># Note: here the fold change is expressed as log-ratios in base 2, 
+# with the average of the five trials being used for each gene&#39;s 
+# condition/control value.
+fold_change &lt;- log2(rowMeans(x[, 1:5]) / rowMeans(x[, 6:10]))
 fold_change</code></pre>
-<pre><code>##            cond1     cond2      cond3     cond4      cond5
-## gene1 1.59092904 1.0314016 15.5414906 0.8196261  0.6537606
-## gene2 2.45234231 2.6688881  0.7345694 1.1701350  5.9724704
-## gene3 2.37221190 0.8018419  0.8649805 0.7432706  5.7067117
-## gene4 0.08227132 1.9294737  0.9211804 0.6000501  0.1142424
-## gene5 1.20247350 1.3631186  0.9162351 1.9852709 24.5445796</code></pre>
+<pre><code>##       gene1       gene2       gene3       gene4       gene5 
+## -0.11348534 -0.72876778 -0.41109342  0.34502340 -0.08326332</code></pre>
 
 
 

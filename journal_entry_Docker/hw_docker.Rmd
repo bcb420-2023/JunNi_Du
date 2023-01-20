@@ -9,9 +9,9 @@ colnames(x) <- c("cond1", "cond2", "cond3", "cond4", "cond5",
 rownames(x) <- c("gene1", "gene2", "gene3", "gene4", "gene5")
 x
 
-# Note: here the fold change is calculated as condition/control. 
-# There also exists another definition of fold change as 
-# (condition - control)/control, but is less-used nowadays.
-fold_change <- (x[, 1:5] / x[, 6:10])
+# Note: here the fold change is expressed as log-ratios in base 2, 
+# with the average of the five trials being used for each gene's 
+# condition/control value.
+fold_change <- log2(rowMeans(x[, 1:5]) / rowMeans(x[, 6:10]))
 fold_change
 ```
