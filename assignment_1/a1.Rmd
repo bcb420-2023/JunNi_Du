@@ -1,0 +1,23 @@
+```{r, message = FALSE}
+if (! requireNamespace("BiocManager", quietly = TRUE)) {
+  install.packages("BiocManager")
+}
+if (! requireNamespace("GEOquery", quietly = TRUE)) {
+  BiocManager::install("GEOquery")
+}
+if (! requireNamespace("readxl", quietly = TRUE)) {
+  install.packages("readxl")
+}
+
+```
+
+
+```{r, message = FALSE}
+dataset_name <- "GSE186950"
+GSE <- GEOquery::getGEOSuppFiles(dataset_name)
+fnames = rownames(GSE)
+table_norm <- read_excel(fnames[1])
+table_raw <- read_excel(fnames[2])
+```
+
+
