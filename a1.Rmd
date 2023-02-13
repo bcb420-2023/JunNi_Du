@@ -1,0 +1,43 @@
+---
+title: "BCB420H1 Assignment 1: Data Set Selection and Initial Processing"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    theme: united
+bibliography: misc/a1.bib 
+csl: misc/biomed-central.csl
+---
+
+```{r, message=FALSE}
+# install required packages, if not already installed.
+if (! requireNamespace("BiocManager", quietly = TRUE)) {
+  install.packages("BiocManager")
+}
+if (! requireNamespace("GEOquery", quietly = TRUE)) {
+  BiocManager::install("GEOquery")
+}
+if (! requireNamespace("readxl", quietly = TRUE)) {
+  install.packages("readxl")
+}
+```
+
+```{r}
+GSE_num <- "GSE186950"
+GSE_dir <- paste0("data/", GSE_num)
+
+# Check if the data is already downloaded in the 'data/GSE186950' directory. If not, download it there.
+if (!file.exists(GSE_dir)) {
+  dataFiles <- GEOquery::getGEOSuppFiles(GSE_num, baseDir = 'data')
+  fnames <- rownames(dataFiles)
+} else {
+  fnames <- paste0(GSE_dir, "/", list.files(path=GSE_dir))
+}
+
+table_norm <- readxl::read_excel(fnames[1])
+table_raw <- readxl::read_excel(fnames[2])
+```
+
+
+# References
+@R-base
