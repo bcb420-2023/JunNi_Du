@@ -52,14 +52,13 @@ library(GEOquery)
 ```{r, message=FALSE}
 # Load the target data set
 GSE_num <- "GSE186950"
-GSE_dir <- paste0("data/", GSE_num)
 
-# Check if the data is already downloaded in the 'data/GSE186950' directory. If not, download it there.
-if (!file.exists(GSE_dir)) {
-  dataFiles <- GEOquery::getGEOSuppFiles(GSE_num, baseDir = 'data')
+# Check if the data is already downloaded If not, download it.
+if (!file.exists(GSE_num)) {
+  dataFiles <- GEOquery::getGEOSuppFiles(GSE_num)
   fnames <- rownames(dataFiles)
 } else {
-  fnames <- paste0(GSE_dir, "/", list.files(path=GSE_dir))
+  fnames <- paste0(GSE_num, "/", list.files(path=GSE_num))
 }
 
 table_raw <- readxl::read_excel(fnames[2])
