@@ -3,11 +3,21 @@ title: "BCB420H1 Assignment 1: Data Set Selection and Initial Processing"
 output:
   html_document:
     toc: true
-    toc_depth: 2
+    toc_depth: 3
     theme: united
+    df_print: paged
 bibliography: misc/a1.bib 
 csl: misc/biomed-central.csl
 ---
+
+---
+
+# Data Set Selection
+
+In this report, we'll be analyzing [**GSE186950**](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE186950)**: Glucocorticoids inhibit human hematopoietic stem cell differentiation toward a common ILC precursor**. This study explores the role of glucocorticoids (GC), a class of steroid hormones and a family of immunosuppressive drugs, in controlling innate lymphoid cell differentiation. @GSE-paper 
+This RNA-seq data set is a part of the overall study where it evaluates the effect of the presence of Dexamethasone (DEX), a glucocorticoid medication, on gene expressions of human hematopoietic stem cells. @GSE
+
+Note: the data set provides both a table of raw data and a table of normalized data. For this assignment, I'll be focusing on the **raw data**.
 
 ```{r, message=FALSE}
 # install required packages, if not already installed.
@@ -17,12 +27,30 @@ if (! requireNamespace("BiocManager", quietly = TRUE)) {
 if (! requireNamespace("GEOquery", quietly = TRUE)) {
   BiocManager::install("GEOquery")
 }
+if (! requireNamespace("knitr", quietly = TRUE)) {
+  install.packages("knitr")
+}
 if (! requireNamespace("readxl", quietly = TRUE)) {
   install.packages("readxl")
 }
+if(!requireNamespace("edgeR", quietly=TRUE)) {
+  install.packages("edgeR")
+}
+if(!requireNamespace("GEOmetadb", quietly=TRUE)) {
+  BiocManager::install("GEOmetadb")
+}
+if(!requireNamespace("biomaRt", quietly=TRUE)) {
+  BiocManager::install("biomaRt")
+}
+
+library(knitr)
+library(edgeR)
+library(biomaRt)
+library(GEOquery)
 ```
 
-```{r}
+```{r, message=FALSE}
+# Load the target data set
 GSE_num <- "GSE186950"
 GSE_dir <- paste0("data/", GSE_num)
 
@@ -34,10 +62,336 @@ if (!file.exists(GSE_dir)) {
   fnames <- paste0(GSE_dir, "/", list.files(path=GSE_dir))
 }
 
-table_norm <- readxl::read_excel(fnames[1])
 table_raw <- readxl::read_excel(fnames[2])
 ```
 
+---
+
+## Overall Statistics
+
+```{r, message=FALSE}
+gse <- GEOquery::getGEO(GSE_num, GSEMatrix=FALSE)
+knitr::kable(data.frame(head(Meta(gse))), format = "html")
+```
+<br>
+**Platform Information**
+``` {r echo=FALSE}
+current_gpl <- names(GPLList(gse))[1]
+current_gpl_info <- Meta(getGEO(current_gpl))
+```
+Platform title: `r current_gpl_info$title`\
+Last update date: `r current_gpl_info$last_update_date`\
+Organism: `r current_gpl_info$organism`\
+Number of GEO datasets that use this technology: `r length(current_gpl_info$series_id)`\
+Number of GEO samples that use this technology: `r length(current_gpl_info$sample_id)`\
+
+<br>
+Number of genes we have measurements for:
+```{r warning=FALSE, message=FALSE}
+nrow(table_raw)
+```
+<br>
+List of samples:
+
+(`Geneid` is currently in their own column, we'll covert them to row names later.)
+```{r warning=FALSE, message=FALSE}
+colnames(table_raw)
+
+# separate to two groups: control and conditioned
+groups <- c()
+for (i in colnames(table_raw)[2:ncol(table_raw)]) {
+  if(grepl("DEX", i)) {
+    groups <- cbind(groups, "DEX")
+  } else {
+    groups <- cbind(groups, "ctrl")
+  }
+}
+colnames(groups) <- colnames(table_raw)[2:7]
+```
+There are 2 groups, control (ctrl) and conditioned (DEX), with 3 samples in each group: AF25, AF26, AF29.
+
+---
+
+# Data Cleaning
+Are there any duplicated genes?
+```{r warning=FALSE, message=FALSE}
+summarized_gene_counts <- sort(table(table_raw$Geneid), decreasing = TRUE)
+
+# Return genes that have frequency greater than 1 (has duplicates)
+knitr::kable(summarized_gene_counts[which(summarized_gene_counts>1)[1:3]], format="html")
+```
+As the above table shows, all genes in the data set are unique. Note that here we treated non-coding RNAs (e.g. A1BG-AS1, which is the antisense of the A1BG gene) and other small RNAs as unique entities.
+
+---
+
+## Remove Genes with Low Counts
+```{r warning=FALSE, message=FALSE}
+cpms <- cpm(table_raw[,2:7])
+
+# there are 3 samples in each group, so we want to keep features that have at least 1 cpm in at least 3 samples.
+keep <- rowSums(cpms >1) >=3
+table_raw_fltr = table_raw[keep,]
+
+dim(table_raw_fltr)
+```
+
+---
+
+## Map to HUGO Gene Symbols
+Most of the rows are already in HUGO gene symbols, but some rows are in other formats (mostly in GenBank Accession IDs). Let's first check how many are not in HUGO gene symbols.
+```{r warning=FALSE, message=FALSE}
+ensembl <- useMart("ensembl", dataset = "hsapiens_gene_ensembl")
+
+# find all genes that are already in HUGO symbol format, then subtract from original table
+raw_gene_conversion <- biomaRt::getBM(
+  attributes=c("hgnc_symbol", "hgnc_symbol"),
+  filters=c("hgnc_symbol"),
+  values=table_raw_fltr$Geneid,
+  mart=ensembl)
+```
+
+Number of genes without existing HGNC mappings: `r nrow(table_raw_fltr) - nrow(raw_gene_conversion)`.
+
+Percent out of total number of genes: `r (nrow(table_raw_fltr) - nrow(raw_gene_conversion))/nrow(table_raw_fltr) * 100`%.
+
+<br>
+**Mapping GenBank Accession IDs**
+
+Unfortunately, there isn't a straightforward way to convert GenBank Accession IDs to HGNC symbols. However, this thread on the Biostars forum @Bio-star-genbank-id suggests mapping using `protein_id` and `embl`.
+```{r warning=FALSE, message=FALSE}
+# extract out rows that are not mapped.
+acc_id_rows <- subset(table_raw_fltr, !(table_raw_fltr$Geneid %in% raw_gene_conversion$hgnc_symbol))
+
+protein_id_conversion <- getBM(attributes = c("protein_id", "hgnc_symbol"),
+                    filters = "protein_id",
+                    values=acc_id_rows$Geneid,
+                    mart = ensembl)
+
+nrow(protein_id_conversion)
+
+embl_conversion <- getBM(attributes = c("embl", "hgnc_symbol"),
+                    filters = "embl",
+                    values=acc_id_rows$Geneid,
+                    mart = ensembl)
+nrow(embl_conversion)
+```
+Attempt to map the genes using `protein_id` yield no result.
+Attempt to map the genes using `embl` yield 1 result.
+
+We'll keep the rows that got mapped to HUGO symbols, plus the one row that got mapped from `embl`, and remove other rows.
+```{r warning=FALSE, message=FALSE}
+mapped_row <- table_raw_fltr[which(table_raw_fltr$Geneid == embl_conversion$embl[1]),]
+mapped_row$Geneid[1] <- embl_conversion$hgnc_symbol[1]
+```
+
+Number of genes without mapping (will be removed): `r nrow(table_raw_fltr) - nrow(raw_gene_conversion) - nrow(mapped_row)`.
+
+Percent out of total number of genes: `r (nrow(table_raw_fltr) - nrow(raw_gene_conversion) - nrow(mapped_row))/nrow(table_raw_fltr) * 100`%.
+
+
+```{r warning=FALSE, message=FALSE}
+# remove all rows that does not contain a HUGO symbol
+table_raw_fltr <- merge(table_raw_fltr, raw_gene_conversion, by.x='Geneid', by.y='hgnc_symbol.1')
+table_raw_fltr$hgnc_symbol <- NULL
+table_raw_fltr <- rbind(table_raw_fltr, mapped_row)
+```
+
+```{r warning=FALSE, message=FALSE}
+# assign HUGO symbols as row names
+rownames(table_raw_fltr) <- table_raw_fltr$Geneid
+table_raw_fltr$Geneid <- NULL
+
+dim(table_raw_fltr)
+```
+
+---
+
+## Remove Outliers
+We'll use a box plot and density plot to visualize the distribution, and to identify any outliers.
+
+### Boxplot
+```{r warning=FALSE, message=FALSE}
+data2plot <- log2(cpm(table_raw_fltr))
+boxplot(data2plot, xlab = "Samples", ylab = "log2 CPM",
+        las = 2, cex = 0.5, cex.lab = 0.5,
+        cex.axis = 0.5, main = "log2 CPM Distributions of RNASeq Samples")
+#draw the median on each box plot
+abline(h = median(apply(data2plot, 2, median)),
+       col = "green", lwd = 0.6, lty = "dashed")
+```
+
+### Density Plot
+```{r warning=FALSE, message=FALSE}
+density_info <- apply(log2(cpm(table_raw_fltr)), 2, density)
+xlim <- 0
+ylim <- 0
+
+for (i in 1:length(density_info)) {
+  xlim <- range(c(xlim, density_info[[i]]$x))
+  ylim <- range(c(ylim, density_info[[i]]$y))
+}
+
+cols <- rainbow(length(density_info))
+ltys <- rep(1, length(density_info))
+
+plot(density_info[[1]], xlim=xlim, ylim=ylim, type="n",
+     ylab="Smoothing density of log2-CPM", cex.lab=0.85,
+     main="log2 CPM Density Distributions of RNASeq Samples")
+
+for (i in 1:length(density_info)) {
+  lines(density_info[[i]], col=cols[i])
+}
+
+legend("topright", colnames(table_raw_fltr), 
+       col=cols, lty=ltys, cex=0.5,
+       border="blue", text.col="green4",
+       merge=TRUE, bg="gray90")
+```
+
+AF29 is slightly higher than the rest, but the difference is far from what would be considered an outlier. Therefore, no samples will be removed.
+
+---
+
+# Normalization
+Our density plot shows the data to be approximately normally distributed. Therefore, we'll use the **TMM** method for normalization. @TMM
+
+```{r warning=FALSE,message=FALSE}
+# create an edgeR container for RNASeq count data
+raw_fltr_matrix <- as.matrix(table_raw_fltr)
+d <- edgeR::DGEList(counts = raw_fltr_matrix, group = groups)
+
+# calculate normalization factor
+d <- calcNormFactors(d)
+
+# get the normalized data
+normalized_counts <- cpm(d)
+```
+
+## Boxplot after normalization
+```{r warning=FALSE,message=FALSE}
+data2plot <- log2(cpm(normalized_counts))
+boxplot(data2plot, xlab = "Samples", ylab = "log2 CPM",
+        las = 2, cex = 0.5, cex.lab = 0.5,
+        cex.axis = 0.5, main = "log2 CPM Distributions of RNASeq Samples (TMM normalized)")
+#draw the median on each box plot
+abline(h = median(apply(data2plot, 2, median)),
+       col = "green", lwd = 0.6, lty = "dashed")
+```
+
+
+## Density plot after normalization
+
+```{r warning=FALSE, message=FALSE}
+normalized_counts_density <- apply(log2(cpm(normalized_counts)), 2, density)
+
+xlim <- 0
+ylim <- 0
+
+for (i in 1:length(normalized_counts_density)) {
+  xlim <- range(c(xlim, normalized_counts_density[[i]]$x))
+  ylim <- range(c(ylim, normalized_counts_density[[i]]$y))
+}
+
+cols <- rainbow(length(normalized_counts_density))
+ltys <- rep(1, length(normalized_counts_density))
+
+plot(normalized_counts_density[[1]], xlim=xlim, ylim=ylim, type="n",
+     ylab="Smoothing density of log2-CPM",
+     main="log2 CPM Density Distributions of RNASeq Samples (TMM normalized)", 
+     cex.lab=0.85)
+
+for (i in 1:length(normalized_counts_density)) {
+  lines(normalized_counts_density[[i]], col=cols[i])
+}
+
+legend("topright", colnames(table_raw_fltr), 
+       col=cols, lty=ltys, cex=0.5,
+       border="blue", text.col="green4",
+       merge=TRUE, bg="gray90")
+```
+
+There isn't much visible difference between the pre- and post-normalization box plot and density plot. A possible explanation for this is that the original data is already normalized or close-to-normalized.
+
+---
+
+### MDS Plot
+```{r visualized post normalized data}
+plotMDS(d, labels = colnames(table_raw_fltr),
+  col = c("darkgreen", "blue")[factor(groups)],
+  main = 'Distance Between Samples')
+```
+
+In the above plot, **dark green is control and blue is conditioned (DEX)**. We can see a clear separation between the two groups which is indicative that the test condition (presence of dexamethasone) does have an effect on expressions and that this data set is high-quality.
+
+---
+
+### Dispersion
+```{r Dispersion}
+model_design <- model.matrix(~groups[1,]+0)
+d <- edgeR::estimateDisp(d, model_design)
+
+# Graphing the dispersion-squared BCV
+plotBCV(d,col.tagwise = "black",col.common = "red", main = "BCV Plot on Normalized Expression Data")
+```
+
+```{r warning=FALSE, message=FALSE}
+edgeR::plotMeanVar(d, show.raw.vars = TRUE,
+                   show.tagwise.vars=TRUE,
+                   show.ave.raw.vars = TRUE,  
+                   NBline = TRUE,
+                   show.binned.common.disp.vars = TRUE,
+                   main = "Mean-Variance Plot on Normalized Expression Data")
+```
+
+For both graphs, genes with lower counts have a bigger variation, whereas genes with more counts have a smaller variation between the samples. For BCV, the points approximately follows the common dispersion line and becomes thinner as the x-axis (average counts) grows. Per the lecture, technical variation decreases as the number of counts increases but biological variation does not. @lec5
+Therefore, these plots indicates that the variations in this data set are more likely to have come from technical variations.
+
+---
+
+### Final Result (Preview)
+```{r}
+knitr::kable(data.frame(head(normalized_counts)), format = "html")
+```
+
+---
+
+# Interpretations
+**What are the control and test conditions of the dataset?**\
+The control is CD34+ hematopoietic stem cells (HSC) that were cultured with several growth factors (SCF, FLT3L, IL15 and IL7) in only the vehicle (dimethyl sulfoxide). The test is HSC cells cultured with the same growth factors but in 500 nmol/L dexamethasone. @GSE-paper
+
+<br>
+**Why is the data set of interest to you?**\
+I took a human immunology course in my third year which piqued my interest in immunology topics. I selected this data set specifically because the author provided a lot of details on both the overall experiment and this data set, making it very easy to interpret the tables. In addition, the data set is relatively small and cleaned-up (e.g. most of the genes are already converted to HUGO symbols, minimal missing data, etc.), while still being comprehensive enough for this assignment. 
+
+<br>
+**Were there expression values that were not unique for specific genes? How did you handle these?**\
+First, genes that have consistent low counts (e.g. 0s) are removed during the data cleaning process.
+```{r}
+# check if there is any genes with the same value across the 3 samples in control
+table_raw_fltr[which(table_raw_fltr$AF25==table_raw_fltr$AF26 & table_raw_fltr$AF25==table_raw_fltr$AF29),]
+
+# check if there is any genes with the same value across the 3 samples in conditioned
+table_raw_fltr[which(table_raw_fltr$AF25DEX==table_raw_fltr$AF26DEX & table_raw_fltr$AF25DEX==table_raw_fltr$AF29DEX),]
+```
+
+As the table above shows, there isn't any gene that has the exact same expression values across all 6 samples. For those that do have the same value across the three samples in each group, most of them are all 0s except three rows. I've decided to keep them in my dataset as there are very few of them.
+
+<br>
+**Were there expression values that could not be mapped to current HUGO symbols?**\
+Yes. On top of HUGO symbols, this data set contains genes annotated in several formats (e.g. GenBank Accession ID, Protein ID, etc.) I attempted to map them using `protein_id` and `embl` per a reply on the Biostars forum @Bio-star-genbank-id, but I was only able to map 1 gene.
+
+<br>
+**How many outliers were removed?**\
+Sample-wise, no outliers were removed since all samples have relatively similar distribution and values as shown in the box plot and density plot. Gene-wise, 46243 genes were removed due to having low counts. A further 847 genes were removed due to not being able to be mapped to a HUGO gene symbol. We started with 58683 genes and end with 11593 genes.
+
+<br>
+**How did you handle replicates?**\
+My data set contains two groups (control/condition), with three replicates in each group. They are corresponded between the two groups (e.g. AF25 is the control of AF25DEX), and there aren't any drastic changes between the samples. So there isn't much handling required in selecting the replicates.
+
+<br>
+**What is the final coverage of your dataset?**\
+The final coverage of my dataset consists of 11593 unique genes.
+
+---
 
 # References
-@R-base
