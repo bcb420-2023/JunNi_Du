@@ -1,0 +1,261 @@
+---
+title: "Data set Pathway and Network Analysis"
+subtitle: "BCB420H1 - Assignment 3"
+author: "Jun Ni Du"
+date: "April 4, 2023"
+output:
+  html_document:
+    toc: true
+    toc_depth: 4
+    toc_float: true
+    toc_collapsed: True
+    smooth_scroll: True
+    theme: cerulean
+    number_sections: true
+    df_print: paged
+    highlight: pygments
+bibliography: misc/a3.bib 
+csl: misc/biomed-central.csl
+---
+
+```{=html}
+<style type="text/css">
+  body{
+  font-size: 11.5pt;
+}
+</style>
+```
+## Report Set-up
+
+Load all required packages for this report and define some global customization settings.
+
+```{r message = FALSE, warning=FALSE}
+# for knitting the .rmd file to .html
+if (! requireNamespace("knitr", quietly = TRUE)) {
+  install.packages("knitr")
+}
+if (! requireNamespace("kableExtra", quietly = TRUE)) {
+  install.packages("kableExtra")
+}
+
+# for creating models and analyzing expression data
+if (! requireNamespace("edgeR", quietly = TRUE)) {
+  BiocManager::install("edgeR")
+}
+if (! requireNamespace("limma", quietly = TRUE)) {
+  BiocManager::install("limma")
+}
+if (! requireNamespace("dplyr", quietly = TRUE)) {
+  install.packages("dplyr")
+}
+if (! requireNamespace("gprofiler2", quietly = TRUE)) {
+  install.packages("gprofiler2")
+}
+
+# for creating plots
+if (! requireNamespace("ggplot2", quietly = TRUE)) {
+  install.packages("ggplot2")
+}
+if (! requireNamespace("ggrepel", quietly = TRUE)) {
+  install.packages("ggrepel")
+}
+if (! requireNamespace("ComplexHeatmap", quietly = TRUE)) {
+  BiocManager::install("ComplexHeatmap")
+}
+if (! requireNamespace("circlize", quietly = TRUE)) {
+  BiocManager::install("circlize")
+}
+if (! requireNamespace("fgsea", quietly = TRUE)) {
+  BiocManager::install("fgsea")
+}
+if (! requireNamespace("qusage", quietly = TRUE)) {
+  BiocManager::install("qusage")
+}
+if (! requireNamespace("clusterProfiler", quietly = TRUE)) {
+  BiocManager::install("clusterProfiler")
+}
+if (! requireNamespace("org.Hs.eg.db", quietly = TRUE)) {
+  BiocManager::install("org.Hs.eg.db")
+}
+
+library(clusterProfiler)
+library(org.Hs.eg.db)
+library(edgeR)
+library(dplyr)
+library(ggplot2)
+library(fgsea)
+library(qusage)
+
+# wraps lines that are too long
+knitr::opts_chunk$set(tidy.opts=list(width.cutoff=80), tidy=TRUE)
+# set default behaviors for all chunks
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+```
+
+All table and figure outputs in this report are rendered using the knitr package @knitr, and kableExtra package @kableExtra for styling. Some codes in this report are adapted from Lecture 10 - GSEA.
+
+------------------------------------------------------------------------
+
+
+# Introduction
+## Background on the Data Set
+
+Glucocorticoids (GC) is a class of steroid hormones that plays a role in regulating the immune system and certain aspects of the immune function, such as inflammation. The most common naturally-produced GC hormone in humans is cortisol, which are produced by the adrenal glands. Due to GC's potent anti-inflammatory effects, several synthetic forms of GC are used as immunosuppressive drugs to treat various medical conditions such as asthma, allergies, autoimmune disorders, and cancer. @GSE-paper
+
+The data set used in this report comes from Quatrini et al. (2022)'s paper: **Glucocorticoids inhibit human hematopoietic stem cell differentiation toward a common ILC precursor** @GSE-paper, where they analyzed the the role of GC on regulating innate lymphoid cells (ILCs) differentiation, including cytotoxic natural killer cells and helper ILCs, from human hematopoietic stem cells (HSCs). The RNA-seq data set used in this report is a part of the overall study; it evaluates the effect of the presence of Dexamethasone (DEX), a glucocorticoid medication, on gene expressions of HSCs. The raw data set is downloaded from the NCBI Gene Expression Omnibus, with ID [**GSE186950**](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE186950). @GSE
+
+## Recap of Assignment \#1 and \#2
+
+In [Assignment 1](https://github.com/bcb420-2023/JunNi_Du/blob/main/a1.Rmd), I performed initial pre-processing and normalization of the data set. The raw data set contains 2 groups, control and conditioned (DEX), with 3 samples in each group: AF25, AF26, AF29. The data set initially contained gene expressions of 58683 genes, but 46243 genes were removed due to low counts with less than 1 count per million in at least 3 samples, leaving 12440 genes.
+
+In the original data set, genes are labeled in a mix of HUGO gene symbols, GenBank accession IDs, EMBL identifiers, etc. Using the biomaRt  package @biomaRt, we attempted to map non-HUGO identifiers to their corresponding HUGO gene symbols, but had to discard 847 (6.8%) genes with no matches, leaving a final set of 11593 unique genes. 
+
+```{r warning=FALSE, message=FALSE, out.width = "75%"}
+knitr::include_graphics('figures/A2/raw_fltr_data_cpm.png')
+```
+
+**Figure 1.** *log2 CPM Distributions of gene expressions of each sample in the data set, after filtering out genes with low-counts or without HUGO gene symbol match, and before TMM normalization. This figure is adapted from Assignment 1 with slight aesthetic modifications.*
+
+As shown in Fig.1, The filtered data set is approximately normally distributed with no outlier samples, and therefore we normalized the data using the Trimmed Mean of M-values (TMM) method, via the edgeR package. @edgeR
+
+In [Assignment 2](https://github.com/bcb420-2023/JunNi_Du/blob/main/A2_JunNi_Du.Rmd), using the normalized data set, we built two models to identify the set of significantly differentially expressed genes. Then, we selected one of the models (a treatment-only model built using the exact test of the edgeR package) and performed thresholded over-representation analysis on genes that are significantly differentially expressed, based on a threshold of FDR-correct p-value < 0.05.
+
+In this assignment, we'll start with the result from the treatment-only exact test model and load it as an .rds file. The `top_et.rds` file can be generated by running `saveRDS(top_et, 'top_et.rds')` after running all code chunks in [A2_JunNi_Du.Rmd](https://github.com/bcb420-2023/JunNi_Du/blob/main/A2_JunNi_Du.Rmd).
+
+```{r warning=FALSE, message=FALSE, tidy=TRUE}
+top_et <- readRDS('top_et.rds')
+et_output <- top_et$table
+
+# calculate rank for each gene
+et_output[,"rank"] <- -log(et_output$PValue,base = 10) * sign(et_output$logFC)
+et_output <- et_output[order(et_output$rank),]
+```
+
+
+
+# Non-thresholded Gene set Enrichment Analysis
+
+```{r warning=FALSE, message=FALSE, tidy=TRUE}
+rnk <- data.frame(rownames(et_output), et_output$rank)
+colnames(rnk) <- c('GeneName', 'rank')
+write.table(rnk, file = "./dex_ctrl.rnk", sep = "\t", col.name = TRUE, row.names = FALSE, quote = FALSE)
+```
+
+
+```{r warning=FALSE, message=FALSE, tidy=TRUE}
+gsea_upreg <- read.table(file = 'gsea_report_for_na_pos_1680460999801.tsv', sep = '\t', header = TRUE, fill = TRUE)
+gsea_downreg <- read.table(file = 'gsea_report_for_na_neg_1680460999801.tsv', sep = '\t', header = TRUE, fill = TRUE)
+```
+
+## Non-thresholded Gene set Enrichment Analysis Questions
+**1. What method did you use? What genesets did you use? Make sure to specify versions and cite your methods.**
+
+**2. Summarize your enrichment results.**
+
+The GSEA pre-ranked identified `r nrow(gsea_upreg)` up-regulated gene sets out of `r sum(nrow(gsea_upreg), nrow(gsea_downreg))` total gene sets, with `r nrow(gsea_upreg[which(gsea_upreg$NOM.p.val < 0.05),])` gene sets having nominal p-value < 0.05 and `r nrow(gsea_upreg[which(gsea_upreg$FDR.q.val <0.25),])` gene set having FDR q-value < 0.25, which indicates significant enrichment.
+
+For down-regulated gene sets, `r nrow(gsea_downreg)` down-regulated gene sets out of `r sum(nrow(gsea_downreg), nrow(gsea_upreg))` total gene sets were identified, with `r nrow(gsea_downreg[which(gsea_downreg$NOM.p.val < 0.05),])` gene sets having nominal p-value < 0.05 and `r nrow(gsea_downreg[which(gsea_downreg$FDR.q.val <0.25),])` gene set having FDR q-value < 0.25, which indicates significant enrichment.
+```{r warning=FALSE, message=FALSE, tidy=TRUE}
+pathway_names <- sapply(stringr::str_split(gsea_upreg$NAME, '%'),'[',1:2)
+pathway_names <- t(pathway_names)
+gsea_upreg <- cbind(pathway_names, gsea_upreg)
+
+upreg <- gsea_upreg[,c('1', '2','SIZE','NES','NOM.p.val',"FDR.q.val")]
+colnames(upreg) <- c('Term', 'Data Source','Size','Normalized Enrichment Score','Nominal p-value',"FDR q-value")
+kableExtra::kable_paper(knitr::kable(head(upreg[which(upreg$'Nominal p-value' < 0.05),]), format = "html", digits=10))
+```
+```{r warning=FALSE, message=FALSE, tidy=TRUE}
+pathway_names <- sapply(stringr::str_split(gsea_downreg$NAME, '%'),'[',1:2)
+pathway_names <- t(pathway_names)
+gsea_downreg <- cbind(pathway_names, gsea_downreg)
+
+downreg <- gsea_downreg[,c('1', '2','SIZE','NES','NOM.p.val',"FDR.q.val")]
+colnames(downreg) <- c('Term', 'Data Source','Size','Normalized Enrichment Score','Nominal p-value',"FDR q-value")
+kableExtra::kable_paper(knitr::kable(head(downreg[which(downreg$'Nominal p-value' < 0.05),]), format = "html", digits=10))
+```
+
+**3. How do these results compare to the results from the thresholded analysis in Assignment #2. Compare qualitatively. Is this a straight forward comparison? Why or why not?**
+
+```{r warning=FALSE, message=FALSE, tidy=TRUE}
+summary_A2 <- readRDS('summary_A2.rds')
+
+upreg_comparison <- data.frame(summary_A2$`top_terms_up-reg`, tolower(upreg$Term[1:8]))
+downreg_comparison <- data.frame(summary_A2$`top_terms_down-reg`, tolower(downreg$Term[1:8]))
+colnames(upreg_comparison) <- c('A#2 ORA Top Terms (Up-Regulated)','A#3 GSEA Top Terms (Up-Regulated)')
+colnames(downreg_comparison) <- c('A#2 ORA Top Terms (Down-Regulated)','A#3 GSEA Top Terms (Down-Regulated)')
+kableExtra::kable_paper(knitr::kable(upreg_comparison, format = "html", digits=10))
+
+```
+
+```{r warning=FALSE, message=FALSE, tidy=TRUE}
+kableExtra::kable_paper(knitr::kable(downreg_comparison, format = "html", digits=10))
+```
+
+# Cytoscape Visualization
+
+# ```{r warning=FALSE, message=FALSE, tidy=TRUE}
+# RCy3::cytoscapePing()
+# RCy3::cytoscapeVersionInfo()
+# ```
+
+
+
+```{r warning=FALSE, message=FALSE, tidy=TRUE}
+
+```
+
+
+## Cytoscape Visualization Questions
+
+**1. Create an enrichment map - how many nodes and how many edges in the resulting map? What thresholds were used to create this map? Make sure to record all thresholds. Include a screenshot of your network prior to manual layout.**
+
+The enrichment map was created using the following thresholds:  
+- FDR q-value cutoff 0.25  
+- p-value cutoff 0.05  
+- gene-set similarity filtering cutoff 0.375 (with default metric: Jaccard+Overlap combined)
+
+**2. Annotate your network - what parameters did you use to annotate the network. If you are using the default parameters make sure to list them as well.**
+
+**3. Make a publication ready figure - include this figure with proper legends in your notebook.**
+
+
+**4. Collapse your network to a theme network. What are the major themes present in this analysis? Do they fit with the model? Are there any novel pathways or themes?**
+
+- **Present your results with the use of tables and screenshots. All figures should have appropriate figure legends.**  
+
+- **If using figures create a figures directory in your repo and make sure all references to the figures are relative in your Rmarkdown notebook.**
+
+# Interpretation and Detailed View of Results
+Background and pre-processing of the data set can be found here: [Background on the Data Set]
+
+Questions from previous sections can be found here: 
+
+- [Non-thresholded Gene set Enrichment Analysis Questions]
+
+- [Cytoscape Visualization Questions]
+
+
+**1. Do the enrichment results support conclusions or mechanism discussed in the original paper? How do these results differ from the results you got from Assignment #2 thresholded methods**
+
+
+**2. Can you find evidence, i.e. publications, to support some of the results that you see. How does this evidence support your result?**
+
+
+**Using your networks and results from the previous section add one of the following:**
+
+**1. Add a post analysis to your main network using specific transcription factors, microRNAs or drugs. Include the reason why you chose the specific miRs, TFs or drugs (i.e publications indicating that they might be related to your model). What does this post analysis show?**
+
+
+**2. Choose a specific pathway or theme to investigate in more detail. Why did you choose this pathway or theme? Show the pathway or theme as a gene network or as a pathway diagram. Annotate the network or pathway with your original log fold expression values and p-values to show how it is effected in your model. (Hint: if the theme or pathway is not from database that has detailed mechanistic information like Reactome you can use apps like GeneMANIA or String to build the the interaction network.)**
+
+
+**3. Sometimes the most interesting information is the gene that has no information. In this type of pathway analysis we can only discover what we have already described previously in the literature or pathway databases. Often pathways found in one disease are applicable to other diseases so this technique can be very helpful. It is important to highlight any genes that are significantly differentially expressed in your model but are not annotated to any pathways. We refer to this set of genes as the dark matter.**
+
+**3.i. Include a heatmap of any significant genes that are not annotated to any of the pathways returned in the enrichment analysis.**
+
+**3.ii. Include a heatmap of any significant genes that are not annotated to any pathways in entire set of pathways used for the analysis.**
+
+
+------------------------------------------------------------------------
+
+# References
