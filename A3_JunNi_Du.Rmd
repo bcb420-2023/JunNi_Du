@@ -406,7 +406,7 @@ heatmap_anno_no_enrich <- ComplexHeatmap::Heatmap(as.matrix(heatmap_matrix_1),
 heatmap_anno_no_enrich
 ```
 
-**Figure 6.** *Heatmap of row-normalized gene expressions, in counts-per-million (CPM), of all genes that are expressed in the dataset (thresholded based on p-value (FDR) < 0.05) and annotated, but not enriched in GSEA. In each sample of the data set. Column-wise, each sample is hierarchically clustered based on the similarity of their gene expressions. Row-wise, each gene is hierarchically clustered based on their expressions across the samples.*
+**Figure 6.** *Heatmap of row-normalized gene expressions, in counts-per-million (CPM), of all genes that are expressed in the dataset (thresholded based on p-value (FDR) < 0.05) and annotated, but not enriched in GSEA. Column-wise, each sample is hierarchically clustered based on the similarity of their gene expressions. Row-wise, each gene is hierarchically clustered based on their expressions across the samples.*
 
 As we can see from the heatmap, there are some distinction of expression pattern between the control and conditioned group. This distinction is not definite (e.g. on the bottom left, we can see a few areas where genes are up-regulated in two of the three samples but down-regulated in the other). Although the distinction does exist, this heat map only contains 28 genes (significantly differentially expressed, annotated, but not enriched), and is unlikely to contain any major significant pathways that we did not already identify.
 
@@ -443,7 +443,7 @@ heatmap_no_anno
 
 ```
 
-**Figure 7.** *Heatmap of row-normalized gene expressions, in counts-per-million (CPM), of all genes that are expressed in the dataset (thresholded based on p-value (FDR) < 0.05) but not annotated. In each sample of the data set. Column-wise, each sample is hierarchically clustered based on the similarity of their gene expressions. Row-wise, each gene is hierarchically clustered based on their expressions across the samples.*
+**Figure 7.** *Heatmap of row-normalized gene expressions, in counts-per-million (CPM), of all genes that are expressed in the dataset (thresholded based on p-value (FDR) < 0.05) but not annotated. Column-wise, each sample is hierarchically clustered based on the similarity of their gene expressions. Row-wise, each gene is hierarchically clustered based on their expressions across the samples.*
 
 Similar to the previous heatmap (annotated but not enriched), this heatmap also clustered some distinction in gene expression patterns between the two groups, but each cluster is not very homogeneous. For example, there exists bands of blue (downregulated) genes in the red area (cluster of up-regulated genes).Although the distinction does exist, this heat map only contains 142 genes (significantly differentially expressed but not annotated). A solution to these dark matter genes is to use a larger set of pathways that could potentially include these genes, but the downside to this is that it could also introduce less-relevant pathways in our network result.
 
