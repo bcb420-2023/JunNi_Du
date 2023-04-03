@@ -25,6 +25,7 @@ csl: misc/biomed-central.csl
 }
 </style>
 ```
+
 ## Report Set-up
 
 Load all required packages for this report and define some global customization settings.
@@ -42,9 +43,6 @@ if (! requireNamespace("kableExtra", quietly = TRUE)) {
 if (! requireNamespace("edgeR", quietly = TRUE)) {
   BiocManager::install("edgeR")
 }
-if (! requireNamespace("limma", quietly = TRUE)) {
-  BiocManager::install("limma")
-}
 if (! requireNamespace("dplyr", quietly = TRUE)) {
   install.packages("dplyr")
 }
@@ -56,8 +54,8 @@ if (! requireNamespace("gprofiler2", quietly = TRUE)) {
 if (! requireNamespace("ggplot2", quietly = TRUE)) {
   install.packages("ggplot2")
 }
-if (! requireNamespace("ggrepel", quietly = TRUE)) {
-  install.packages("ggrepel")
+if (! requireNamespace("VennDiagram", quietly = TRUE)) {
+  install.packages("VennDiagram")
 }
 if (! requireNamespace("ComplexHeatmap", quietly = TRUE)) {
   BiocManager::install("ComplexHeatmap")
@@ -85,6 +83,7 @@ library(dplyr)
 library(ggplot2)
 library(fgsea)
 library(qusage)
+library(VennDiagram)
 
 # wraps lines that are too long
 knitr::opts_chunk$set(tidy.opts=list(width.cutoff=80), tidy=TRUE)
@@ -193,12 +192,6 @@ kableExtra::kable_paper(knitr::kable(downreg_comparison, format = "html", digits
 
 # Cytoscape Visualization
 
-# ```{r warning=FALSE, message=FALSE, tidy=TRUE}
-# RCy3::cytoscapePing()
-# RCy3::cytoscapeVersionInfo()
-# ```
-
-
 
 ```{r warning=FALSE, message=FALSE, tidy=TRUE}
 
@@ -210,29 +203,59 @@ kableExtra::kable_paper(knitr::kable(downreg_comparison, format = "html", digits
 **1. Create an enrichment map - how many nodes and how many edges in the resulting map? What thresholds were used to create this map? Make sure to record all thresholds. Include a screenshot of your network prior to manual layout.**
 
 The enrichment map was created using the following thresholds:  
-- FDR q-value cutoff 0.25  
-- p-value cutoff 0.05  
-- gene-set similarity filtering cutoff 0.375 (with default metric: Jaccard+Overlap combined)
+
+* FDR q-value cutoff 0.25  
+* p-value cutoff 0.05  
+* gene-set similarity filtering cutoff 0.375 (with default metric: Jaccard+Overlap combined)
+
+The enrichment map has 63 nodes and 71 edges.
+```{r warning=FALSE, message=FALSE}
+knitr::include_graphics('figures/A3/GseaPreranked.png')
+```
 
 **2. Annotate your network - what parameters did you use to annotate the network. If you are using the default parameters make sure to list them as well.**
 
+Using the AutoAnnotate App available in Cytoscape with the following parameters:  
+
+* Max number of annotations: 10
+* Cluster Options: Use clusterMaker App  
+  * Cluster algorithm: MCL Cluster
+  * Edge weight column: None
+* Label Column: Name
+* Label Algorithm: WordCloud: Adjacent Words (default)
+* Max words per label: 3
+* Minimum word occurrence: 1
+* Adjacent word bonus: 8
+
+
 **3. Make a publication ready figure - include this figure with proper legends in your notebook.**
+
+The enrichment map below was created using the parameters above, arranged used GoSE layout and spatially-rearranged to be more compact.
+
+```{r warning=FALSE, message=FALSE}
+knitr::include_graphics('figures/A3/EM_grouped.png')
+```
 
 
 **4. Collapse your network to a theme network. What are the major themes present in this analysis? Do they fit with the model? Are there any novel pathways or themes?**
 
-- **Present your results with the use of tables and screenshots. All figures should have appropriate figure legends.**  
+```{r warning=FALSE, message=FALSE}
+knitr::include_graphics('figures/A3/theme.png')
+```
 
-- **If using figures create a figures directory in your repo and make sure all references to the figures are relative in your Rmarkdown notebook.**
+Per the above figure, some of the major themes include immune system (e.g.lymphocyte mediated immunity, antigen receptor-mediated signaling pathway, regulation of interferon-beta production, defense response to virus, etc.) and cell signaling (e.g. signal transduction protein, nervous system axonogenesis, activation involved response). All the gene sets in these themes are down-regulated, which fits with our models where the presence of dexamethasone downregulates immune system responses and cell signaling, which is the mechanism for its anti-inflammatory property.
+
+Two novel themes that are shown in the annotated clusters and the theme network, but not in the top hits of the models, are 'p53 class mediator' and 'sequestering calcium ion'. Additional discussion regarding these findings can be found in question 2 of [Interpretation and Detailed View of Results].
 
 # Interpretation and Detailed View of Results
-Background and pre-processing of the data set can be found here: [Background on the Data Set]
+Background and pre-processing of the data set can be found here: 
+
+* [Background on the Data Set]
 
 Questions from previous sections can be found here: 
 
-- [Non-thresholded Gene set Enrichment Analysis Questions]
-
-- [Cytoscape Visualization Questions]
+* [Non-thresholded Gene set Enrichment Analysis Questions]
+* [Cytoscape Visualization Questions]
 
 
 **1. Do the enrichment results support conclusions or mechanism discussed in the original paper? How do these results differ from the results you got from Assignment #2 thresholded methods**
@@ -240,21 +263,161 @@ Questions from previous sections can be found here:
 
 **2. Can you find evidence, i.e. publications, to support some of the results that you see. How does this evidence support your result?**
 
+Two novel themes that are shown in the annotated clusters and the theme network, but not in the top hits of the models, are 'p53 class mediator' and 'sequestering calcium ion'. p53 is a tumor suppressor protein that regulates cell division. In a paper by Sengupta et al. (2000), it is said that dexamethasone-activated endogenous and exogenous glucocorticoid receptor inhibit p53-dependent functions@p53, so it makes sense to see this theme down-regulated in our network. 
 
 **Using your networks and results from the previous section add one of the following:**
 
-**1. Add a post analysis to your main network using specific transcription factors, microRNAs or drugs. Include the reason why you chose the specific miRs, TFs or drugs (i.e publications indicating that they might be related to your model). What does this post analysis show?**
+I chose to answer question 3, regarding dark matter.
 
-
-**2. Choose a specific pathway or theme to investigate in more detail. Why did you choose this pathway or theme? Show the pathway or theme as a gene network or as a pathway diagram. Annotate the network or pathway with your original log fold expression values and p-values to show how it is effected in your model. (Hint: if the theme or pathway is not from database that has detailed mechanistic information like Reactome you can use apps like GeneMANIA or String to build the the interaction network.)**
-
+## Dark Matter
 
 **3. Sometimes the most interesting information is the gene that has no information. In this type of pathway analysis we can only discover what we have already described previously in the literature or pathway databases. Often pathways found in one disease are applicable to other diseases so this technique can be very helpful. It is important to highlight any genes that are significantly differentially expressed in your model but are not annotated to any pathways. We refer to this set of genes as the dark matter.**
 
+```{r warning=FALSE, message=FALSE, tidy=TRUE}
+# extract out the sets of genes required for the Venn diagram.
+gene_sets <- fgsea::gmtPathways('Human_GOBP_AllPathways_no_GO_iea_March_02_2023_symbol.gmt')
+Annotated <- unique(unlist(gene_sets))
+Enriched <- unique(unlist(gene_sets[c(gsea_upreg$NAME, gsea_downreg$NAME)]))
+genes_expressed <- readRDS('raw_fltr_matrix.rds')
+Expressed<- unique(rownames(genes_expressed))
+```
+
+```{r warning=FALSE, message=FALSE, tidy=TRUE}
+venn_diag<-draw.triple.venn( area1=length(Annotated), area2=length(Enriched), area3 = length(Expressed),
+          n12 = length(intersect(Annotated,Enriched)), n13=length(intersect(Annotated,Expressed)),
+          n23 = length(intersect(Enriched,Expressed)), 
+          n123 = length(intersect(Annotated,intersect(Enriched,Expressed))),
+          category = c("Annotated","Enriched","Expressed"),
+          fill = hcl.colors(3, palette = "Sunset"),fontfamily ="Arial",cat.fontfamily = "Arial",cat.cex = 1.2,
+)
+grid::grid.draw(venn_diag)
+```
+
+Per the Venn diagram, `r length(intersect(Annotated,intersect(Enriched,Expressed)))` out of `r length(Expressed)` filtered expressed genes (81.76\%) were annotated and enriched. This is ideal as it is an indication that the outputs of our enrichment analyses is a good representation of the expression data. Here, we'll focus on the 2114 genes that were not enriched, which contains 1620 expressed genes that are not enriched nor annotated, and 494 genes that are annotated but not enriched.
+
+```{r warning=FALSE, message=FALSE}
+# set of genes that are annotated but not enriched
+anno_no_enrich <- setdiff(intersect(Expressed, Annotated), Enriched)
+anno_no_enrich <- et_output[anno_no_enrich,]
+# filter out genes that are not significantly differentially expressed
+anno_no_enrich <- anno_no_enrich[which(anno_no_enrich$FDR<0.05),]
+
+# set of genes with no annotation
+no_anno <- setdiff(Expressed, Annotated)
+no_anno <- et_output[no_anno,]
+# filter out genes that are not significantly differentially expressed
+no_anno <- no_anno[which(no_anno$FDR<0.05),]
+```
+
+```{r warning=FALSE, message=FALSE}
+rmarkdown::paged_table(anno_no_enrich[order(anno_no_enrich$rank, decreasing = TRUE),c('FDR','rank')])
+```
+
+```{r warning=FALSE, message=FALSE}
+rmarkdown::paged_table(no_anno[order(no_anno$rank, decreasing = TRUE),c('FDR','rank')])
+```
+
+
+```{r warning=FALSE, message=FALSE}
+# creating normalized CPM for heatmap
+dge <- edgeR::DGEList(counts = genes_expressed, group = c('CTRL', 'CTRL', 'CTRL', 'DEX', 'DEX', 'DEX'))
+
+# calculate normalization factor
+dge <- calcNormFactors(dge)
+# get the normalized data
+normalized_cpm <- cpm(dge)
+```
+
 **3.i. Include a heatmap of any significant genes that are not annotated to any of the pathways returned in the enrichment analysis.**
+```{r warning=FALSE, message=FALSE}
+# creating heatmap matrix
+heatmap_matrix_1 <- t(scale(t(normalized_cpm[rownames(anno_no_enrich),])))
+heatmap_col = circlize::colorRamp2(c(min(heatmap_matrix_1), 0, max(heatmap_matrix_1)), 
+                                   c("blue", "white", "red"))  
+
+# creating treament annotation
+treat_colours <- c("orange", "darkblue")
+names(treat_colours) <- c("DEX", "CTRL")
+treatment_col <- ComplexHeatmap::HeatmapAnnotation(df=data.frame(
+  treatment = rep(c("CTRL", "DEX"), c(3, 3))),
+  col = list(treatment = treat_colours))
+
+# Create the heatmap
+heatmap_anno_no_enrich <- ComplexHeatmap::Heatmap(as.matrix(heatmap_matrix_1),
+                           cluster_rows = TRUE,
+                           cluster_columns = TRUE,
+                           show_row_dend = TRUE,
+                           show_column_dend = TRUE,
+                           col = heatmap_col,
+                           show_column_names = TRUE,
+                           show_row_names = FALSE,
+                           show_heatmap_legend = TRUE,
+                           top_annotation = treatment_col,
+                           column_title = "Differential Gene Expressions of Genes That Are Annotated but Not Enriched",
+                           name="row-normalized \ngene expression"
+  )
+heatmap_anno_no_enrich
+```
+
+As we can see from the heatmap, there are some distinction of expression pattern between the control and conditioned group. This distinction is not definite (e.g. on the bottom left, we can see a few areas where genes are up-regulated in two of the three samples but down-regulated in the other). Although the distinction does exist, this heat map only contains 28 genes (significantly differentially expressed, annotated, but not enriched), and is unlikely to contain any major significant pathways that we did not already identify.
+
+```{r warning=FALSE, message=FALSE, tidy=TRUE}
+gp_no_enrich <- gprofiler2::gost(query = rownames(anno_no_enrich), organism = "hsapiens", sources = c("GO:BP",
+    "KEGG", "REAC", "WP"), significant = TRUE, user_threshold = 0.05, correction_method = "fdr",
+    exclude_iea = TRUE)
+```
+
+
+```{r warning=FALSE, message=FALSE, tidy=TRUE, echo=FALSE}
+gprofiler2::gostplot(gp_no_enrich)
+```
+
+```
 
 **3.ii. Include a heatmap of any significant genes that are not annotated to any pathways in entire set of pathways used for the analysis.**
 
+```{r warning=FALSE, message=FALSE}
+# creating heatmap matrix
+heatmap_matrix_2 <- t(scale(t(normalized_cpm[rownames(no_anno),])))
+heatmap_col = circlize::colorRamp2(c(min(heatmap_matrix_2), 0, max(heatmap_matrix_2)), 
+                                   c("blue", "white", "red"))  
+
+# creating treatment annotation
+treat_colours <- c("orange", "darkblue")
+names(treat_colours) <- c("DEX", "CTRL")
+treatment_col <- ComplexHeatmap::HeatmapAnnotation(df=data.frame(
+  treatment = rep(c("CTRL", "DEX"), c(3, 3))),
+  col = list(treatment = treat_colours))
+
+# Create the heatmap
+heatmap_no_anno <- ComplexHeatmap::Heatmap(as.matrix(heatmap_matrix_2),
+                           cluster_rows = TRUE,
+                           cluster_columns = TRUE,
+                           show_row_dend = TRUE,
+                           show_column_dend = TRUE,
+                           col = heatmap_col,
+                           show_column_names = TRUE,
+                           show_row_names = FALSE,
+                           show_heatmap_legend = TRUE,
+                           top_annotation = treatment_col,
+                           column_title = "Differential Gene Expressions of Genes That Are Not Annotated",
+                           name="row-normalized \ngene expression"
+  )
+heatmap_no_anno
+```
+Similar to the previous heatmap (annotated but not enriched), this heatmap also clustered some distinction in gene expression patterns between the two groups, but each cluster is not very homogeneous. For example, there exists bands of blue (downregulated) genes in the red area (cluster of up-regulated genes).Although the distinction does exist, this heat map only contains 142 genes (significantly differentially expressed but not annotated). A solution to these dark matter genes is to use a larger set of pathways that could potentially include these genes, but the downside to this is that it could also introduce less-relevant pathways in our network result.
+
+
+```{r warning=FALSE, message=FALSE, tidy=TRUE}
+gp_no_anno <- gprofiler2::gost(query = rownames(no_anno), organism = "hsapiens", sources = c("GO:BP",
+    "KEGG", "REAC", "WP"), significant = TRUE, user_threshold = 0.05, correction_method = "fdr",
+    exclude_iea = TRUE)
+```
+
+
+```{r warning=FALSE, message=FALSE, tidy=TRUE, echo=FALSE}
+gprofiler2::gostplot(gp_no_anno)
+```
 
 ------------------------------------------------------------------------
 
