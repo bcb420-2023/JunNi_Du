@@ -312,7 +312,7 @@ As shown in Table 2A and 2B, the enrichment results are mostly similar to the th
 
 **2. Can you find evidence, i.e. publications, to support some of the results that you see. How does this evidence support your result?**
 
-- Interferons are a group of signaling proteins made and released by host cells in response to the presence of viruses. GC suppressed immune cell signalings, which also include interferons. @interferon This supports our result where "interferon 913531 hsa" is one of the major theme that is downregulated.
+Interferons are a group of signaling proteins made and released by host cells in response to the presence of viruses. GC suppressed immune cell signalings, which also include interferons. @interferon This supports our result where "interferon 913531 hsa" is one of the major theme that is downregulated.
 
 Two novel themes that are shown in the annotated clusters and the theme network, but not in the top hits of the models, are 'p53 class mediator' and 'sequestering calcium ion'. p53 is a tumor suppressor protein that regulates cell division. In a paper by Sengupta et al. (2000), it is said that dexamethasone-activated endogenous and exogenous GC receptor inhibit p53-dependent functions@p53, so it makes sense to see this theme down-regulated in our network. Regarding calcium ion, GC increase renal calcium excretion by decreasing calcium re-absorption @calcium. This aligns with our finding that 'sequestering (storage/retention) calcium ion' is downregulated in our network. 
 
