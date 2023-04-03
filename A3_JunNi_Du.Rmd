@@ -357,7 +357,7 @@ rmarkdown::paged_table(no_anno[order(no_anno$rank, decreasing = TRUE),c('FDR','r
 
 **Table 3B.** *List of genes that are expressed in the dataset, but do not have annotations.*
 
-Based on Table 3, we briefly examine the genes that are significantly expressed but not annotated or not enriched:
+Based on Table 3, we briefly examine the genes that are significantly expressed but not annotated or not enriched using GeneCards @genecards:
 
 * CORO2A: encodes a member of the WD repeat protein family which is involved in a variety of cellular processes, including cell cycle progression, signal transduction, apoptosis, and gene regulation.
 * GLDN: encodes a protein that promotes formation of the nodes of Ranvier in the peripheral nervous system. 
