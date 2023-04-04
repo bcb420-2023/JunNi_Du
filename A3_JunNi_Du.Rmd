@@ -129,7 +129,7 @@ colnames(rnk) <- c('GeneName', 'rank')
 write.table(rnk, file = "./dex_ctrl.rnk", sep = "\t", col.name = TRUE, row.names = FALSE, quote = FALSE)
 ```
 
-Using the rank (.rnk) file of our dataset, together with the [gene set file (.gmt)](https://github.com/bcb420-2023/JunNi_Du/blob/main/Human_GOBP_AllPathways_no_GO_iea_March_02_2023_symbol.gmt) from baderLab released on March 02, 2023 @bader, we run GSEAPreranked with the following parameters:
+Using the rank (.rnk) file of our dataset, together with the [gene set file (.gmt)](https://github.com/bcb420-2023/JunNi_Du/blob/main/Human_GOBP_AllPathways_no_GO_iea_March_02_2023_symbol.gmt) from baderLab released on March 02, 2023 @bader (codes for downloading this file can be found in the [GSEA journal entry](https://github.com/bcb420-2023/JunNi_Du/wiki/Journal-Entry-%2308:-(HW)-GSEA)), we run GSEAPreranked with the following parameters:
 
 * Number of permutation: 1000
 * Coppase/Remap to gene symbols: No Collapse
